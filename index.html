@@ -171,7 +171,7 @@
             border-radius: 5px;
         }
 
-        .level-button, #back-button, #restart-button, #endless-button {
+        .level-button, #back-button, #restart-button, #endless-button, #daily-challenge-button, #language-button {
             display: inline-block;
             padding: 12px 25px;
             margin: 8px;
@@ -184,7 +184,7 @@
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .level-button:hover, #back-button:hover, #restart-button:hover, #endless-button:hover {
+        .level-button:hover, #back-button:hover, #restart-button:hover, #endless-button:hover, #daily-challenge-button:hover, #language-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 198, 255, 0.5);
         }
@@ -202,18 +202,46 @@
             border-radius: 10px;
         }
 
-        h1, h2 {
+        #leaderboard {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+        }
+
+        #leaderboard h3 {
+            margin: 0 0 10px;
+        }
+
+        #leaderboard-list {
+            list-style: none;
+            padding: 0;
+            text-align: right;
+        }
+
+        #leaderboard-list li {
+            font-size: 16px;
+            margin: 5px 0;
+        }
+
+        h1, h2, h3 {
             text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
     </style>
 </head>
 <body>
     <div id="game-container">
-        <h1>Crystal Clash Puzzle</h1>
+        <h1 id="title">Crystal Clash Puzzle</h1>
         <div id="level-selection">
-            <h2>اختر مستوى</h2>
+            <h2 id="select-level">اختر مستوى</h2>
             <button id="endless-button">وضع لا نهائي</button>
+            <button id="daily-challenge-button">التحدي اليومي</button>
+            <button id="language-button">English</button>
             <div id="level-buttons"></div>
+            <div id="leaderboard">
+                <h3 id="leaderboard-title">أعلى الدرجات</h3>
+                <ul id="leaderboard-list"></ul>
+            </div>
         </div>
         <div id="game-area" style="display: none;">
             <h2 id="level-title"></h2>
@@ -272,14 +300,96 @@
         ];
 
         const sounds = {
-            place: new Audio('data:audio/mpeg;base64,/+MYxAAAAANIAAAAAExBTUUzLjk4LjIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'),
-            clear: new Audio('data:audio/mpeg;base64,/+MYxAAAAANIAAAAAExBTUUzLjk4LjIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'),
-            complete: new Audio('data:audio/mpeg;base64,/+MYxAAAAANIAAAAAExBTUUzLjk4LjIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
+            place: new Audio('https://raw.githubusercontent.com/elmandoh/Crystal-Clash-Puzzle/main/assets/place.mp3'),
+            clear: new Audio('https://raw.githubusercontent.com/elmandoh/Crystal-Clash-Puzzle/main/assets/clear.mp3'),
+            complete: new Audio('https://raw.githubusercontent.com/elmandoh/Crystal-Clash-Puzzle/main/assets/complete.mp3')
         };
 
-        function initializeGame(levelIndex, isEndless = false) {
+        const translations = {
+            ar: {
+                title: 'Crystal Clash Puzzle',
+                selectLevel: 'اختر مستوى',
+                endless: 'وضع لا نهائي',
+                dailyChallenge: 'التحدي اليومي',
+                language: 'English',
+                level: 'المستوى',
+                score: 'النقاط: {score} | الخطوط: {lines}/{goal}',
+                stats: 'الكتل المستخدمة: {blocks} | أعلى درجة: {highScore}',
+                restart: 'إعادة المستوى',
+                back: 'العودة إلى القائمة',
+                success: 'مبروك! لقد أكملت المستوى!',
+                nextLevel: 'انتقل إلى المستوى {level}!',
+                allLevels: 'مبروك! لقد أكملت جميع المستويات! جرب الوضع اللا نهائي!',
+                endlessGoal: 'مبروك! الهدف الجديد: {goal} خطوط!',
+                invalidMove: 'لا يمكن وضع الكتلة هنا!',
+                backgroundSuccess: 'تم تغيير الخلفية!',
+                backgroundError: 'يرجى اختيار صورة صالحة!',
+                leaderboard: 'أعلى الدرجات',
+                dailyAvailable: 'التحدي اليومي متاح!',
+                dailyCompleted: 'لقد أكملت التحدي اليومي! عُد غدًا!'
+            },
+            en: {
+                title: 'Crystal Clash Puzzle',
+                selectLevel: 'Select Level',
+                endless: 'Endless Mode',
+                dailyChallenge: 'Daily Challenge',
+                language: 'العربية',
+                level: 'Level',
+                score: 'Score: {score} | Lines: {lines}/{goal}',
+                stats: 'Blocks Used: {blocks} | High Score: {highScore}',
+                restart: 'Restart Level',
+                back: 'Back to Menu',
+                success: 'Congratulations! You completed the level!',
+                nextLevel: 'Proceed to Level {level}!',
+                allLevels: 'Congratulations! You completed all levels! Try Endless Mode!',
+                endlessGoal: 'Great job! New goal: {goal} lines!',
+                invalidMove: 'Cannot place block here!',
+                backgroundSuccess: 'Background changed!',
+                backgroundError: 'Please select a valid image!',
+                leaderboard: 'Leaderboard',
+                dailyAvailable: 'Daily Challenge is available!',
+                dailyCompleted: 'You completed the Daily Challenge! Come back tomorrow!'
+            }
+        };
+
+        let currentLanguage = 'ar';
+
+        function setLanguage(lang) {
+            currentLanguage = lang;
+            const t = translations[lang];
+            document.getElementById('title').textContent = t.title;
+            document.getElementById('select-level').textContent = t.selectLevel;
+            document.getElementById('endless-button').textContent = t.endless;
+            document.getElementById('daily-challenge-button').textContent = t.dailyChallenge;
+            document.getElementById('language-button').textContent = t.language;
+            document.getElementById('restart-button').textContent = t.restart;
+            document.getElementById('back-button').textContent = t.back;
+            document.getElementById('leaderboard-title').textContent = t.leaderboard;
+            updateGameUI();
+            updateLeaderboard();
+        }
+
+        function updateGameUI() {
+            const t = translations[currentLanguage];
+            const scoreDisplay = document.getElementById('score');
+            const statsDisplay = document.getElementById('stats');
+            const levelTitle = document.getElementById('level-title');
+            if (scoreDisplay.dataset) {
+                scoreDisplay.textContent = t.score
+                    .replace('{score}', scoreDisplay.dataset.score || 0)
+                    .replace('{lines}', scoreDisplay.dataset.lines || 0)
+                    .replace('{goal}', scoreDisplay.dataset.goal || 0);
+                statsDisplay.textContent = t.stats
+                    .replace('{blocks}', statsDisplay.dataset.blocks || 0)
+                    .replace('{highScore}', statsDisplay.dataset.highScore || 0);
+                levelTitle.textContent = levelTitle.dataset.isEndless === 'true' ? t.endless : t.level + ' ' + (parseInt(levelTitle.dataset.level) + 1);
+            }
+        }
+
+        function initializeGame(levelIndex, isEndless = false, isDaily = false) {
             const levelData = isEndless ? { size: 6, lockedCells: [], linesGoal: 5 } : levels[levelIndex];
             let { size: boardSize, lockedCells, linesGoal } = levelData;
+            if (isDaily) linesGoal = Math.ceil(linesGoal * 1.5);
             const board = Array(boardSize).fill().map(() => Array(boardSize).fill(0));
             let score = 0;
             let linesCleared = 0;
@@ -294,9 +404,10 @@
             const messageDisplay = document.getElementById('message');
             const blockArea = document.getElementById('block-area');
             const levelTitle = document.getElementById('level-title');
-            const restartButton = document.getElementById('restart-button');
 
-            levelTitle.textContent = isEndless ? 'وضع لا نهائي' : `المستوى ${levelIndex + 1}`;
+            levelTitle.textContent = isEndless ? translations[currentLanguage].endless : isDaily ? translations[currentLanguage].dailyChallenge : translations[currentLanguage].level + ' ' + (levelIndex + 1);
+            levelTitle.dataset.isEndless = isEndless;
+            levelTitle.dataset.level = levelIndex;
             gameBoard.style.gridTemplateColumns = `repeat(${boardSize}, 40px)`;
             updateStats();
 
@@ -327,16 +438,22 @@
                 addNewBlock();
             }
 
-            restartButton.addEventListener('click', () => initializeGame(levelIndex, isEndless));
+            document.getElementById('restart-button').addEventListener('click', () => initializeGame(levelIndex, isEndless, isDaily));
 
             function updateStats() {
-                scoreDisplay.textContent = `النقاط: ${score} | الخطوط: ${linesCleared}/${linesGoal}`;
-                statsDisplay.textContent = `الكتل المستخدمة: ${blocksUsed} | أعلى درجة: ${highScore}`;
+                const t = translations[currentLanguage];
+                scoreDisplay.textContent = t.score.replace('{score}', score).replace('{lines}', linesCleared).replace('{goal}', linesGoal);
+                scoreDisplay.dataset.score = score;
+                scoreDisplay.dataset.lines = linesCleared;
+                scoreDisplay.dataset.goal = linesGoal;
+                statsDisplay.textContent = t.stats.replace('{blocks}', blocksUsed).replace('{highScore}', highScore);
+                statsDisplay.dataset.blocks = blocksUsed;
+                statsDisplay.dataset.highScore = highScore;
                 progressBar.style.width = `${(linesCleared / linesGoal) * 100}%`;
             }
 
             function addDynamicObstacle() {
-                if (isEndless || levelIndex >= 10) {
+                if (isEndless || isDaily || levelIndex >= 10) {
                     const emptyCells = [];
                     for (let i = 0; i < boardSize; i++) {
                         for (let j = 0; j < boardSize; j++) {
@@ -407,7 +524,7 @@
                 } else {
                     e.target.classList.add('invalid');
                     setTimeout(() => e.target.classList.remove('invalid'), 300);
-                    messageDisplay.textContent = 'لا يمكن وضع الكتلة هنا!';
+                    messageDisplay.textContent = translations[currentLanguage].invalidMove;
                     messageDisplay.classList.add('error');
                     messageDisplay.classList.remove('success');
                 }
@@ -463,32 +580,36 @@
                     updateBoard();
                     if (score > highScore) {
                         localStorage.setItem('highScore', score);
+                        updateLeaderboard(score);
                     }
                     if (linesCleared >= linesGoal) {
                         if (isEndless) {
                             linesGoal += 2;
                             if (boardSize > 3) boardSize = Math.max(3, boardSize - 1);
                             addDynamicObstacle();
-                            messageDisplay.textContent = `مبروك! الهدف الجديد: ${linesGoal} خطوط!`;
+                            messageDisplay.textContent = translations[currentLanguage].endlessGoal.replace('{goal}', linesGoal);
                             messageDisplay.classList.add('success');
                             sounds.complete.play();
                         } else {
-                            if (levelIndex + 1 < levels.length && !unlockedLevels.includes(levelIndex + 1)) {
+                            if (!isDaily && levelIndex + 1 < levels.length && !unlockedLevels.includes(levelIndex + 1)) {
                                 unlockedLevels.push(levelIndex + 1);
                                 localStorage.setItem('unlockedLevels', JSON.stringify(unlockedLevels));
                             }
-                            messageDisplay.textContent = 'مبروك! لقد أكملت المستوى!';
+                            if (isDaily) {
+                                localStorage.setItem('dailyCompleted', new Date().toDateString());
+                            }
+                            messageDisplay.textContent = translations[currentLanguage].success;
                             messageDisplay.classList.add('success');
                             messageDisplay.classList.remove('error');
                             blockArea.innerHTML = '';
                             sounds.complete.play();
                             setTimeout(() => {
-                                if (levelIndex + 1 < levels.length) {
+                                if (!isDaily && levelIndex + 1 < levels.length) {
                                     showLevelSelection();
-                                    messageDisplay.textContent = `انتقل إلى المستوى ${levelIndex + 2}!`;
+                                    messageDisplay.textContent = translations[currentLanguage].nextLevel.replace('{level}', levelIndex + 2);
                                     messageDisplay.classList.add('success');
                                 } else {
-                                    messageDisplay.textContent = 'مبروك! لقد أكملت جميع المستويات! جرب الوضع اللا نهائي!';
+                                    messageDisplay.textContent = isDaily ? translations[currentLanguage].dailyCompleted : translations[currentLanguage].allLevels;
                                     messageDisplay.classList.add('success');
                                 }
                             }, 1000);
@@ -536,6 +657,23 @@
             setupBlocks();
         }
 
+        function updateLeaderboard(newScore = null) {
+            const leaderboard = JSON.parse(localStorage.getItem('leaderboard') || '[]');
+            if (newScore) {
+                leaderboard.push({ score: newScore, date: new Date().toLocaleString() });
+                leaderboard.sort((a, b) => b.score - a.score);
+                if (leaderboard.length > 5) leaderboard.length = 5;
+                localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+            }
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = '';
+            leaderboard.forEach((entry, index) => {
+                const li = document.createElement('li');
+                li.textContent = `${index + 1}. ${entry.score} - ${entry.date}`;
+                list.appendChild(li);
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const levelSelection = document.getElementById('level-selection');
             const gameArea = document.getElementById('game-area');
@@ -543,12 +681,14 @@
             const levelButtons = document.getElementById('level-buttons');
             const backgroundUpload = document.getElementById('background-upload');
             const endlessButton = document.getElementById('endless-button');
+            const dailyChallengeButton = document.getElementById('daily-challenge-button');
+            const languageButton = document.getElementById('language-button');
             const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '[0]');
 
             levels.forEach((_, index) => {
                 const button = document.createElement('button');
                 button.classList.add('level-button');
-                button.textContent = `المستوى ${index + 1}`;
+                button.textContent = `${translations[currentLanguage].level} ${index + 1}`;
                 if (!unlockedLevels.includes(index)) {
                     button.classList.add('locked');
                     button.disabled = true;
@@ -568,13 +708,42 @@
                 initializeGame(0, true);
             });
 
+            dailyChallengeButton.addEventListener('click', () => {
+                const today = new Date().toDateString();
+                const dailyCompleted = localStorage.getItem('dailyCompleted');
+                if (dailyCompleted === today) {
+                    document.getElementById('message').textContent = translations[currentLanguage].dailyCompleted;
+                    document.getElementById('message').classList.add('error');
+                    document.getElementById('message').classList.remove('success');
+                } else {
+                    levelSelection.style.display = 'none';
+                    gameArea.style.display = 'block';
+                    const randomLevel = Math.floor(Math.random() * levels.length);
+                    initializeGame(randomLevel, false, true);
+                }
+            });
+
+            languageButton.addEventListener('click', () => {
+                setLanguage(currentLanguage === 'ar' ? 'en' : 'ar');
+            });
+
             backButton.addEventListener('click', showLevelSelection);
 
             function showLevelSelection() {
                 gameArea.style.display = 'none';
                 levelSelection.style.display = 'block';
-                document.getElementById('message').textContent = '';
-                document.getElementById('message').classList.remove('success', 'error');
+                const today = new Date().toDateString();
+                const dailyCompleted = localStorage.getItem('dailyCompleted');
+                const messageDisplay = document.getElementById('message');
+                if (dailyCompleted !== today) {
+                    messageDisplay.textContent = translations[currentLanguage].dailyAvailable;
+                    messageDisplay.classList.add('success');
+                    messageDisplay.classList.remove('error');
+                } else {
+                    messageDisplay.textContent = translations[currentLanguage].dailyCompleted;
+                    messageDisplay.classList.add('error');
+                    messageDisplay.classList.remove('success');
+                }
             }
 
             backgroundUpload.addEventListener('change', (e) => {
@@ -586,13 +755,13 @@
                         document.body.style.background = `url(${event.target.result})`;
                         document.body.style.backgroundSize = 'cover';
                         document.body.style.backgroundPosition = 'center';
-                        document.getElementById('message').textContent = 'تم تغيير الخلفية!';
+                        document.getElementById('message').textContent = translations[currentLanguage].backgroundSuccess;
                         document.getElementById('message').classList.add('success');
                         document.getElementById('message').classList.remove('error');
                     };
                     reader.readAsDataURL(file);
                 } else {
-                    document.getElementById('message').textContent = 'يرجى اختيار صورة صالحة!';
+                    document.getElementById('message').textContent = translations[currentLanguage].backgroundError;
                     document.getElementById('message').classList.add('error');
                     document.getElementById('message').classList.remove('success');
                 }
@@ -604,6 +773,9 @@
                 document.body.style.backgroundSize = 'cover';
                 document.body.style.backgroundPosition = 'center';
             }
+
+            updateLeaderboard();
+            setLanguage('ar');
         });
     </script>
 </body>
