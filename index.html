@@ -50,7 +50,7 @@
             background: #444;
             border: 1px solid #666;
             box-sizing: border-box;
-            transition: transform 0.2s;
+            transition: transform 0.2s, opacity 0.3s;
         }
 
         .cell.filled {
@@ -171,7 +171,7 @@
             border-radius: 5px;
         }
 
-        .level-button, #back-button, #restart-button {
+        .level-button, #back-button, #restart-button, #endless-button {
             display: inline-block;
             padding: 12px 25px;
             margin: 8px;
@@ -184,9 +184,14 @@
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .level-button:hover, #back-button:hover, #restart-button:hover {
+        .level-button:hover, #back-button:hover, #restart-button:hover, #endless-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 198, 255, 0.5);
+        }
+
+        .level-button.locked {
+            background: #555;
+            cursor: not-allowed;
         }
 
         #level-selection {
@@ -207,6 +212,7 @@
         <h1>Crystal Clash Puzzle</h1>
         <div id="level-selection">
             <h2>اختر مستوى</h2>
+            <button id="endless-button">وضع لا نهائي</button>
             <div id="level-buttons"></div>
         </div>
         <div id="game-area" style="display: none;">
@@ -259,8 +265,10 @@
         const blockShapes = [
             { name: 'square', cells: [[0, 0], [0, 1], [1, 0], [1, 1]] },
             { name: 'L', cells: [[0, 0], [1, 0], [2, 0], [2, 1]] },
+            { name: 'L_reverse', cells: [[0, 1], [1, 1], [2, 1], [2, 0]] },
             { name: 'T', cells: [[0, 0], [0, 1], [0, 2], [1, 1]] },
-            { name: 'line', cells: [[0, 0], [0, 1], [0, 2], [0, 3]] }
+            { name: 'line', cells: [[0, 0], [0, 1], [0, 2], [0, 3]] },
+            { name: 'Z', cells: [[0, 0], [0, 1], [1, 1], [1, 2]] }
         ];
 
         const sounds = {
@@ -269,13 +277,16 @@
             complete: new Audio('data:audio/mpeg;base64,/+MYxAAAAANIAAAAAExBTUUzLjk4LjIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
         };
 
-        function initializeGame(levelIndex) {
-            const { size: boardSize, lockedCells, linesGoal } = levels[levelIndex];
+        function initializeGame(levelIndex, isEndless = false) {
+            const levelData = isEndless ? { size: 6, lockedCells: [], linesGoal: 5 } : levels[levelIndex];
+            let { size: boardSize, lockedCells, linesGoal } = levelData;
             const board = Array(boardSize).fill().map(() => Array(boardSize).fill(0));
             let score = 0;
             let linesCleared = 0;
             let blocksUsed = 0;
+            let moves = 0;
             const highScore = localStorage.getItem('highScore') || 0;
+            const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '[0]');
             const gameBoard = document.getElementById('game-board');
             const scoreDisplay = document.getElementById('score');
             const statsDisplay = document.getElementById('stats');
@@ -285,7 +296,7 @@
             const levelTitle = document.getElementById('level-title');
             const restartButton = document.getElementById('restart-button');
 
-            levelTitle.textContent = `المستوى ${levelIndex + 1}`;
+            levelTitle.textContent = isEndless ? 'وضع لا نهائي' : `المستوى ${levelIndex + 1}`;
             gameBoard.style.gridTemplateColumns = `repeat(${boardSize}, 40px)`;
             updateStats();
 
@@ -316,12 +327,32 @@
                 addNewBlock();
             }
 
-            restartButton.addEventListener('click', () => initializeGame(levelIndex));
+            restartButton.addEventListener('click', () => initializeGame(levelIndex, isEndless));
 
             function updateStats() {
                 scoreDisplay.textContent = `النقاط: ${score} | الخطوط: ${linesCleared}/${linesGoal}`;
                 statsDisplay.textContent = `الكتل المستخدمة: ${blocksUsed} | أعلى درجة: ${highScore}`;
                 progressBar.style.width = `${(linesCleared / linesGoal) * 100}%`;
+            }
+
+            function addDynamicObstacle() {
+                if (isEndless || levelIndex >= 10) {
+                    const emptyCells = [];
+                    for (let i = 0; i < boardSize; i++) {
+                        for (let j = 0; j < boardSize; j++) {
+                            if (board[i][j] === 0) emptyCells.push([i, j]);
+                        }
+                    }
+                    if (emptyCells.length > 0) {
+                        const [row, col] = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                        board[row][col] = 2;
+                        const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                        cell.classList.add('locked');
+                        cell.style.opacity = 0;
+                        cell.style.transition = 'opacity 0.5s';
+                        setTimeout(() => cell.style.opacity = 1, 50);
+                    }
+                }
             }
 
             function setupBlocks() {
@@ -366,7 +397,9 @@
                     });
                     document.getElementById(blockId).remove();
                     blocksUsed++;
+                    moves++;
                     sounds.place.play();
+                    if (moves % 5 === 0) addDynamicObstacle();
                     checkLines();
                     addNewBlock();
                     messageDisplay.textContent = '';
@@ -432,21 +465,34 @@
                         localStorage.setItem('highScore', score);
                     }
                     if (linesCleared >= linesGoal) {
-                        messageDisplay.textContent = 'مبروك! لقد أكملت المستوى!';
-                        messageDisplay.classList.add('success');
-                        messageDisplay.classList.remove('error');
-                        blockArea.innerHTML = '';
-                        sounds.complete.play();
-                        setTimeout(() => {
-                            if (levelIndex + 1 < levels.length) {
-                                showLevelSelection();
-                                messageDisplay.textContent = `انتقل إلى المستوى ${levelIndex + 2}!`;
-                                messageDisplay.classList.add('success');
-                            } else {
-                                messageDisplay.textContent = 'مبروك! لقد أكملت جميع المستويات!';
-                                messageDisplay.classList.add('success');
+                        if (isEndless) {
+                            linesGoal += 2;
+                            if (boardSize > 3) boardSize = Math.max(3, boardSize - 1);
+                            addDynamicObstacle();
+                            messageDisplay.textContent = `مبروك! الهدف الجديد: ${linesGoal} خطوط!`;
+                            messageDisplay.classList.add('success');
+                            sounds.complete.play();
+                        } else {
+                            if (levelIndex + 1 < levels.length && !unlockedLevels.includes(levelIndex + 1)) {
+                                unlockedLevels.push(levelIndex + 1);
+                                localStorage.setItem('unlockedLevels', JSON.stringify(unlockedLevels));
                             }
-                        }, 1000);
+                            messageDisplay.textContent = 'مبروك! لقد أكملت المستوى!';
+                            messageDisplay.classList.add('success');
+                            messageDisplay.classList.remove('error');
+                            blockArea.innerHTML = '';
+                            sounds.complete.play();
+                            setTimeout(() => {
+                                if (levelIndex + 1 < levels.length) {
+                                    showLevelSelection();
+                                    messageDisplay.textContent = `انتقل إلى المستوى ${levelIndex + 2}!`;
+                                    messageDisplay.classList.add('success');
+                                } else {
+                                    messageDisplay.textContent = 'مبروك! لقد أكملت جميع المستويات! جرب الوضع اللا نهائي!';
+                                    messageDisplay.classList.add('success');
+                                }
+                            }, 1000);
+                        }
                     }
                 }
                 updateStats();
@@ -463,7 +509,7 @@
             }
 
             function addNewBlock() {
-                if (linesCleared >= linesGoal) return;
+                if (linesCleared >= linesGoal && !isEndless) return;
                 const blockArea = document.getElementById('block-area');
                 const shape = blockShapes[Math.floor(Math.random() * blockShapes.length)];
                 const newBlock = document.createElement('div');
@@ -496,17 +542,30 @@
             const backButton = document.getElementById('back-button');
             const levelButtons = document.getElementById('level-buttons');
             const backgroundUpload = document.getElementById('background-upload');
+            const endlessButton = document.getElementById('endless-button');
+            const unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels') || '[0]');
 
             levels.forEach((_, index) => {
                 const button = document.createElement('button');
                 button.classList.add('level-button');
                 button.textContent = `المستوى ${index + 1}`;
-                button.addEventListener('click', () => {
-                    levelSelection.style.display = 'none';
-                    gameArea.style.display = 'block';
-                    initializeGame(index);
-                });
+                if (!unlockedLevels.includes(index)) {
+                    button.classList.add('locked');
+                    button.disabled = true;
+                } else {
+                    button.addEventListener('click', () => {
+                        levelSelection.style.display = 'none';
+                        gameArea.style.display = 'block';
+                        initializeGame(index);
+                    });
+                }
                 levelButtons.appendChild(button);
+            });
+
+            endlessButton.addEventListener('click', () => {
+                levelSelection.style.display = 'none';
+                gameArea.style.display = 'block';
+                initializeGame(0, true);
             });
 
             backButton.addEventListener('click', showLevelSelection);
